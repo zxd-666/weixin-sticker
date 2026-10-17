@@ -1,0 +1,4 @@
+interface:
+  display_name: "微信表情包制作"
+  short_description: "根据主题制作微信静态表情和配套素材，切割校验后交付 ZIP"
+  default_prompt: "用 $weixin-sticker 帮我制作一套微信静态表情包。"

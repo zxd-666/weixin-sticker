@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>表情包切割</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23ff6b35'/%3E%3Cpath d='M20 25h24M20 33h24M20 41h15' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --card: #1a1a1a;
+    --border: #2a2a2a;
+    --text: #e0e0e0;
+    --muted: #666;
+    --accent: #ff6b35;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px;
+  }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 32px; }
+  input[type="file"] { display: none; }
+  .upload-zone {
+    width: 100%; max-width: 420px;
+    border: 2px dashed var(--border); border-radius: 12px;
+    padding: 48px 24px; text-align: center; cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .upload-zone:hover { border-color: var(--accent); }
+  .upload-zone.dragover { border-color: var(--accent); background: rgba(255,107,53,0.05); }
+  .upload-zone.has-image { padding: 16px; border-style: solid; border-color: var(--border); }
+  .upload-zone p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .preview { max-width: 100%; max-height: 360px; border-radius: 8px; display: block; margin: 0 auto; }
+  .actions {
+    margin-top: 20px; display: none; gap: 12px; justify-content: center;
+    flex-wrap: wrap; align-items: center;
+  }
+  button {
+    background: var(--accent); color: #fff; border: none;
+    padding: 10px 28px; border-radius: 8px; font-size: 14px;
+    font-weight: 500; cursor: pointer; transition: opacity 0.2s;
+  }
+  button:hover { opacity: 0.85; }
+  button.secondary { background: var(--card); border: 1px solid var(--border); }
+  .threshold-ctrl {
+    display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px;
+  }
+  .threshold-ctrl input[type="range"] { width: 80px; accent-color: var(--accent); }
+  .grid-count-ctrl { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+  .grid-count-ctrl select {
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 8px; font: inherit;
+  }
+  .result { margin-top: 36px; width: 100%; max-width: 720px; display: none; }
+  .result-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .result-header h2 { font-size: 16px; font-weight: 600; }
+  .album-name { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+  .album-name input, .piece-name {
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 8px; font: inherit;
+  }
+  .album-name input { width: 135px; }
+  .theme-parser { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 14px; }
+  .theme-parser label { display: block; color: var(--text); font-size: 13px; margin-bottom: 8px; }
+  .theme-parser textarea {
+    width: 100%; min-height: 54px; box-sizing: border-box; resize: vertical;
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px; font: inherit; font-size: 13px;
+  }
+  .theme-parser-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  .theme-parser-actions button { padding: 7px 14px; font-size: 12px; }
+  .theme-parser-actions span { color: var(--muted); font-size: 12px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px; border-radius: 10px; overflow: visible; background: none;
+  }
+  .grid-item {
+    background: repeating-conic-gradient(#1a1a1a 0% 25%, #222 0% 50%) 50% / 16px 16px;
+    border-radius: 6px; overflow: hidden; position: relative;
+    border: 1px solid var(--border); transition: border-color 0.15s;
+  }
+  .grid-item:hover { border-color: #454545; }
+  .grid-item img { width: 100%; display: block; cursor: pointer; }
+  .piece-actions {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px; background: var(--card); border-top: 1px solid var(--border);
+  }
+  .piece-action {
+    display: grid; place-items: center; flex: 0 0 28px;
+    width: 28px; height: 28px; padding: 0;
+    color: #aaa; background: #262626; border: 1px solid #393939; border-radius: 6px;
+  }
+  .piece-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .piece-delete { color: #ee8a8a; }
+  .piece-delete:hover { background: #3a2424; }
+  .piece-crop:hover { background: #343434; }
+  .piece-action:focus-visible, .piece-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .piece-name {
+    flex: 1 1 0; width: 0; min-width: 0; height: 28px;
+    padding: 0 6px; font-size: 12px;
+  }
+  .info { color: var(--muted); font-size: 12px; margin-top: 12px; text-align: center; }
+  .loading {
+    display: none; margin-top: 20px; color: var(--muted); font-size: 14px;
+    text-align: center;
+  }
+  .loading.show { display: block; }
+  .loading::after { content: ''; animation: dots 1.5s infinite; }
+  @keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+  .crop-modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 20;
+    align-items: center; justify-content: center; padding: 20px;
+    background: rgba(0,0,0,0.7);
+  }
+  .crop-modal-overlay.open { display: flex; }
+  .crop-modal {
+    width: min(92vw, 620px); background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; box-shadow: 0 18px 60px rgba(0,0,0,0.45); overflow: hidden;
+  }
+  .crop-modal-header, .crop-modal-footer {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px;
+  }
+  .crop-modal-header { border-bottom: 1px solid var(--border); }
+  .crop-modal-header h2 { font-size: 15px; font-weight: 600; }
+  .crop-modal-footer { border-top: 1px solid var(--border); justify-content: flex-end; }
+  .crop-modal-footer button, .crop-modal-header button { padding: 8px 14px; font-size: 13px; }
+  .crop-modal-header .secondary { padding: 5px 9px; }
+  .crop-body { padding: 16px; }
+  .crop-stage {
+    min-height: 180px; display: flex; align-items: center; justify-content: center;
+    overflow: hidden; border-radius: 8px;
+    background: repeating-conic-gradient(#1a1a1a 0% 25%, #222 0% 50%) 50% / 16px 16px;
+  }
+  #cropPreview { display: block; width: min(100%, 420px); height: auto; aspect-ratio: 1; touch-action: none; cursor: grab; }
+  #cropPreview.dragging { cursor: grabbing; }
+  .crop-controls { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .crop-controls label { display: flex; align-items: center; gap: 8px; flex: 1; color: var(--muted); font-size: 12px; }
+  .crop-controls input { flex: 1; accent-color: var(--accent); }
+  .crop-controls output { min-width: 38px; color: var(--text); font-size: 12px; text-align: right; }
+  .crop-controls .secondary { padding: 6px 10px; font-size: 12px; }
+  .crop-mode-controls button { flex: 1; }
+  .crop-mode-controls .active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #cropPreview.erasing { cursor: crosshair; }
+  .crop-erase-controls[hidden] { display: none; }
+  .crop-hint { margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.5; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>表情包切割</h1>
+
+<input type="file" id="fileInput" accept="image/*">
+<label class="upload-zone" id="dropZone" for="fileInput">
+  <p id="uploadHint">拖入图片或点击上传<br><span style="font-size:12px">网格切割 / 智能拆分去底色</span></p>
+</label>
+
+<div class="actions" id="actions">
+  <button id="cutBtn">网格切割</button>
+  <div class="grid-count-ctrl" aria-label="网格等分数量">
+    <label for="gridRows">行
+      <select id="gridRows">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3" selected>3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+      </select>
+    </label>
+    <span aria-hidden="true">×</span>
+    <label for="gridColumns">列
+      <select id="gridColumns">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3" selected>3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+      </select>
+    </label>
+  </div>
+  <button id="extractBtn">智能拆分去底色</button>
+  <button class="secondary" id="resetBtn">重新选择</button>
+  <div class="threshold-ctrl">
+    <span>底色容差</span>
+    <input type="range" id="threshold" min="8" max="80" value="32">
+    <span id="thresholdVal">32</span>
+  </div>
+</div>
+
+<p class="loading" id="loading">正在处理</p>
+
+<div class="result" id="result">
+  <div class="result-header">
+    <h2 id="resultTitle">切割结果</h2>
+    <label class="album-name" for="albumName">专辑名 <input id="albumName" value="表情包" aria-label="中文专辑名"></label>
+    <button id="downloadAll" style="padding:6px 16px;font-size:12px" title="打包为一个 ZIP 文件，内含全部透明 PNG">下载全部（ZIP）</button>
+  </div>
+  <div class="theme-parser">
+    <label for="themeText">批量填写主题名（可选，按图片顺序用顿号“、”分隔）</label>
+    <textarea id="themeText" placeholder="你好、开心、点赞"></textarea>
+    <div class="theme-parser-actions">
+      <button id="parseThemes" type="button">智能解析并填入</button>
+      <span id="parseStatus" role="status" aria-live="polite">主题名不限语言；留空按 1.png、2.png……命名。</span>
+    </div>
+  </div>
+  <div class="grid" id="grid"></div>
+  <p class="info" id="info"></p>
+</div>
+
+<div class="crop-modal-overlay" id="cropModal" role="dialog" aria-modal="true" aria-labelledby="cropTitle">
+  <div class="crop-modal">
+    <div class="crop-modal-header">
+      <h2 id="cropTitle">调整方形裁切</h2>
+      <button class="secondary" id="cropClose" type="button">关闭</button>
+    </div>
+    <div class="crop-body">
+      <div class="crop-stage"><canvas id="cropPreview"></canvas></div>
+      <div class="crop-controls">
+        <label for="cropZoom">缩放 <input id="cropZoom" type="range" min="10" max="400" value="100"><output id="cropZoomValue">100%</output></label>
+        <button class="secondary" id="cropReset" type="button">重置</button>
+      </div>
+      <div class="crop-controls crop-mode-controls" role="group" aria-label="裁切操作模式">
+        <button class="secondary active" id="cropMove" type="button" aria-pressed="true">移动原图</button>
+        <button class="secondary" id="cropErase" type="button" aria-pressed="false">涂抹透明</button>
+      </div>
+      <div class="crop-controls crop-erase-controls" id="cropEraseControls" hidden>
+        <label for="cropBrushSize">笔刷 <input id="cropBrushSize" type="range" min="4" max="160" value="28"><output id="cropBrushValue">28px</output></label>
+        <button class="secondary" id="cropUndo" type="button" disabled>撤销</button>
+        <button class="secondary" id="cropClear" type="button" disabled>清空</button>
+      </div>
+      <p class="crop-hint" id="cropHint">拖动原图并调整缩放；方框固定为 240×240，未覆盖区域保持透明。</p>
+    </div>
+    <div class="crop-modal-footer">
+      <button class="secondary" id="cropCancel" type="button">取消</button>
+      <button id="cropApply" type="button">应用裁切</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const dropZone = $('dropZone');
+const fileInput = $('fileInput');
+const uploadHint = $('uploadHint');
+const actions = $('actions');
+const cutBtn = $('cutBtn');
+const gridRows = $('gridRows');
+const gridColumns = $('gridColumns');
+const extractBtn = $('extractBtn');
+const resetBtn = $('resetBtn');
+const result = $('result');
+const grid = $('grid');
+const downloadAll = $('downloadAll');
+const albumName = $('albumName');
+const themeText = $('themeText');
+const parseThemesButton = $('parseThemes');
+const parseStatus = $('parseStatus');
+const info = $('info');
+const resultTitle = $('resultTitle');
+const thresholdInput = $('threshold');
+const thresholdVal = $('thresholdVal');
+const loading = $('loading');
+const cropModal = $('cropModal');
+const cropPreview = $('cropPreview');
+const cropHint = $('cropHint');
+const cropZoom = $('cropZoom');
+const cropZoomValue = $('cropZoomValue');
+const cropReset = $('cropReset');
+const cropMove = $('cropMove');
+const cropErase = $('cropErase');
+const cropEraseControls = $('cropEraseControls');
+const cropBrushSize = $('cropBrushSize');
+const cropBrushValue = $('cropBrushValue');
+const cropUndo = $('cropUndo');
+const cropClear = $('cropClear');
+const cropClose = $('cropClose');
+const cropCancel = $('cropCancel');
+const cropApply = $('cropApply');
+
+let currentFile = null;
+let pieces = [];
+let cropState = null;
+const EXPORT_SIZE = 240;
+
+thresholdInput.addEventListener('input', () => { thresholdVal.textContent = thresholdInput.value; });
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+function loadFile(file) {
+  if (!file.type.startsWith('image/')) return;
+  currentFile = file;
+  const url = URL.createObjectURL(file);
+  dropZone.classList.add('has-image');
+  uploadHint.innerHTML = '<img class="preview" src="' + url + '">';
+  actions.style.display = 'flex';
+  result.style.display = 'none';
+  pieces = [];
+}
+
+resetBtn.addEventListener('click', () => {
+  currentFile = null; pieces = [];
+  fileInput.value = '';
+  dropZone.classList.remove('has-image');
+  uploadHint.innerHTML = '拖入图片或点击上传<br><span style="font-size:12px">网格切割 / 智能拆分去底色</span>';
+  actions.style.display = 'none';
+  result.style.display = 'none';
+});
+
+function showLoading() { loading.classList.add('show'); }
+function hideLoading() { loading.classList.remove('show'); }
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+// ============================================================
+//  模式1：等分网格切割
+// ============================================================
+
+function equalGridRects(width, height, rows, columns) {
+  const safeRows = Number.isInteger(rows) && rows >= 1 ? rows : 3;
+  const safeColumns = Number.isInteger(columns) && columns >= 1 ? columns : safeRows;
+  const regions = [];
+  for (let row = 0; row < safeRows; row++) {
+    const y1 = Math.floor(row * height / safeRows);
+    const y2 = Math.floor((row + 1) * height / safeRows);
+    for (let col = 0; col < safeColumns; col++) {
+      const x1 = Math.floor(col * width / safeColumns);
+      const x2 = Math.floor((col + 1) * width / safeColumns);
+      regions.push([x1, y1, x2, y2]);
+    }
+  }
+  return regions;
+}
+
+cutBtn.addEventListener('click', () => {
+  if (!currentFile) return;
+  showLoading();
+  setTimeout(() => {
+    try {
+      doGridCut();
+    } catch (e) { alert('切割失败: ' + e.message); }
+    hideLoading();
+  }, 30);
+});
+
+function doGridCut() {
+  const url = URL.createObjectURL(currentFile);
+  const img = new Image();
+  img.onload = () => {
+    const w = img.width, h = img.height;
+    const rows = Number(gridRows.value);
+    const columns = Number(gridColumns.value);
+    const rects = equalGridRects(w, h, rows, columns);
+    renderResults(img, rects, rows + '×' + columns + ' 等分切割');
+  };
+  img.src = url;
+}
+
+// ============================================================
+//  模式2：智能拆分去底色
+//  已透明图片直接沿用 Alpha；不透明图片只移除与边缘连通的底色。
+//  再把小装饰归到最近的主体，避免爱心、闪光等被单独导出。
+// ============================================================
+
+extractBtn.addEventListener('click', () => {
+  if (!currentFile) return;
+  showLoading();
+  setTimeout(() => {
+    try {
+      doExtract();
+    } catch (e) { alert('处理失败: ' + e.message); }
+    hideLoading();
+  }, 30);
+});
+
+function detectBgColor(data, w, h) {
+  // 采样四角区域的平均 RGB。仅用于不透明图片的边缘底色识别。
+  const s = Math.max(1, Math.min(15, Math.floor(Math.min(w, h) / 4)));
+  let rr = 0, gg = 0, bb = 0, count = 0;
+  const corners = [[0, 0], [w - s, 0], [0, h - s], [w - s, h - s]];
+  for (const [sx, sy] of corners) {
+    for (let dy = 0; dy < s; dy++) {
+      for (let dx = 0; dx < s; dx++) {
+        const off = ((sy + dy) * w + (sx + dx)) * 4;
+        if (data[off + 3] < 8) continue;
+        rr += data[off]; gg += data[off + 1]; bb += data[off + 2];
+        count++;
+      }
+    }
+  }
+  return count ? { r: rr / count, g: gg / count, b: bb / count } : { r: 0, g: 0, b: 0 };
+}
+
+function hasTransparentCanvas(data) {
+  const pixelCount = data.length / 4;
+  const step = Math.max(1, Math.floor(pixelCount / 12000));
+  let sampled = 0, transparent = 0;
+  for (let i = 0; i < pixelCount; i += step) {
+    sampled++;
+    if (data[i * 4 + 3] < 8) transparent++;
+  }
+  return transparent / sampled > 0.01;
+}
+
+function colorDistance(data, pixelIndex, color) {
+  const off = pixelIndex * 4;
+  return Math.max(
+    Math.abs(data[off] - color.r),
+    Math.abs(data[off + 1] - color.g),
+    Math.abs(data[off + 2] - color.b)
+  );
+}
+
+function removeEdgeConnectedBackground(data, w, h, tolerance) {
+  const total = w * h;
+  const transparentData = new Uint8ClampedArray(data);
+  const background = detectBgColor(data, w, h);
+  const visited = new Uint8Array(total);
+  const queue = new Int32Array(total);
+  let head = 0, tail = 0;
+  const enqueue = index => {
+    if (visited[index] || colorDistance(data, index, background) > tolerance) return;
+    visited[index] = 1;
+    queue[tail++] = index;
+  };
+
+  for (let x = 0; x < w; x++) { enqueue(x); enqueue((h - 1) * w + x); }
+  for (let y = 1; y < h - 1; y++) { enqueue(y * w); enqueue(y * w + w - 1); }
+
+  while (head < tail) {
+    const index = queue[head++];
+    const x = index % w, y = (index / w) | 0;
+    if (x > 0) enqueue(index - 1);
+    if (x < w - 1) enqueue(index + 1);
+    if (y > 0) enqueue(index - w);
+    if (y < h - 1) enqueue(index + w);
+  }
+
+  const mask = new Uint8Array(total);
+  for (let i = 0; i < total; i++) {
+    if (visited[i]) transparentData[i * 4 + 3] = 0;
+    else if (transparentData[i * 4 + 3] >= 8) mask[i] = 1;
+  }
+  return { mask, transparentData, background };
+}
+
+function labelComponents(mask, w, h) {
+  const total = w * h;
+  const labels = new Int32Array(total).fill(-1);
+  const components = [];
+  const queue = new Int32Array(total);
+  let nextLabel = 0;
+
+  for (let start = 0; start < total; start++) {
+    if (!mask[start] || labels[start] !== -1) continue;
+    let head = 0, tail = 1, pixelCount = 0;
+    queue[0] = start;
+    labels[start] = nextLabel;
+    let minX = start % w, maxX = minX, minY = (start / w) | 0, maxY = minY;
+
+    while (head < tail) {
+      const index = queue[head++];
+      const x = index % w, y = (index / w) | 0;
+      pixelCount++;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+
+      for (let dy = -1; dy <= 1; dy++) {
+        const ny = y + dy;
+        if (ny < 0 || ny >= h) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          if ((dx === 0 && dy === 0) || nx < 0 || nx >= w) continue;
+          const neighbor = ny * w + nx;
+          if (mask[neighbor] && labels[neighbor] === -1) {
+            labels[neighbor] = nextLabel;
+            queue[tail++] = neighbor;
+          }
+        }
+      }
+    }
+    components.push({ label: nextLabel++, minX, minY, maxX, maxY, pixelCount });
+  }
+  return { labels, components };
+}
+
+function boxDistance(a, b) {
+  const dx = Math.max(0, a.minX - b.maxX - 1, b.minX - a.maxX - 1);
+  const dy = Math.max(0, a.minY - b.maxY - 1, b.minY - a.maxY - 1);
+  return Math.hypot(dx, dy);
+}
+
+function addToGroup(group, component) {
+  group.labels.push(component.label);
+  group.minX = Math.min(group.minX, component.minX);
+  group.minY = Math.min(group.minY, component.minY);
+  group.maxX = Math.max(group.maxX, component.maxX);
+  group.maxY = Math.max(group.maxY, component.maxY);
+}
+
+function groupComponents(components, w, h) {
+  const total = w * h;
+  const minPrimaryPixels = Math.max(80, Math.round(total * 0.001));
+  const minPrimaryBoxArea = Math.max(250, Math.round(total * 0.003));
+  let primary = components.filter(component => {
+    const boxArea = (component.maxX - component.minX + 1) * (component.maxY - component.minY + 1);
+    return component.pixelCount >= minPrimaryPixels && boxArea >= minPrimaryBoxArea;
+  });
+  if (!primary.length && components.length) primary = [components.reduce((largest, component) =>
+    component.pixelCount > largest.pixelCount ? component : largest
+  )];
+
+  const primaryLabels = new Set(primary.map(component => component.label));
+  const groups = primary.map(component => ({
+    anchor: component,
+    orphan: false,
+    labels: [component.label],
+    minX: component.minX, minY: component.minY, maxX: component.maxX, maxY: component.maxY
+  }));
+  const assignmentDistance = Math.max(12, Math.round(Math.min(w, h) * 0.03));
+  const orphanMinPixels = Math.max(24, Math.round(total * 0.00008));
+  const decorations = components.filter(component => !primaryLabels.has(component.label))
+    .sort((a, b) => b.pixelCount - a.pixelCount);
+
+  for (const component of decorations) {
+    let closest = null, closestDistance = Infinity;
+    for (const group of groups) {
+      const distance = boxDistance(component, group);
+      if (distance < closestDistance) { closest = group; closestDistance = distance; }
+    }
+    if (closest && closestDistance <= assignmentDistance) addToGroup(closest, component);
+    else if (component.pixelCount >= orphanMinPixels) {
+      groups.push({
+        anchor: component,
+        orphan: true,
+        labels: [component.label],
+        minX: component.minX, minY: component.minY, maxX: component.maxX, maxY: component.maxY
+      });
+    }
+  }
+
+  // A far decoration can start an orphan group; later nearby fragments may bridge it
+  // back to a main sticker. Recheck the final group boxes before exporting.
+  for (const orphan of groups.filter(group => group.orphan)) {
+    let closest = null, closestDistance = Infinity;
+    const orphanArea = (orphan.maxX - orphan.minX + 1) * (orphan.maxY - orphan.minY + 1);
+    for (const group of groups) {
+      if (group.orphan) continue;
+      const groupArea = (group.maxX - group.minX + 1) * (group.maxY - group.minY + 1);
+      const distance = boxDistance(orphan, group);
+      if (orphanArea <= groupArea * 0.25 && distance < closestDistance) {
+        closest = group;
+        closestDistance = distance;
+      }
+    }
+    if (closest && closestDistance <= assignmentDistance) {
+      closest.labels.push(...orphan.labels);
+      closest.minX = Math.min(closest.minX, orphan.minX);
+      closest.minY = Math.min(closest.minY, orphan.minY);
+      closest.maxX = Math.max(closest.maxX, orphan.maxX);
+      closest.maxY = Math.max(closest.maxY, orphan.maxY);
+      orphan.merged = true;
+    }
+  }
+
+  const rowTolerance = Math.max(12, Math.round(Math.min(w, h) * 0.06));
+  return groups.filter(group => !group.merged).sort((a, b) => {
+    const aCenterY = (a.anchor.minY + a.anchor.maxY) / 2;
+    const bCenterY = (b.anchor.minY + b.anchor.maxY) / 2;
+    return Math.abs(aCenterY - bCenterY) <= rowTolerance ? a.anchor.minX - b.anchor.minX : aCenterY - bCenterY;
+  });
+}
+
+function segmentStickers(data, w, h, options = {}) {
+  const tolerance = Number.isFinite(options.tolerance) ? options.tolerance : 32;
+  const total = w * h;
+  let mask, transparentData, background = null;
+  if (hasTransparentCanvas(data)) {
+    transparentData = new Uint8ClampedArray(data);
+    mask = new Uint8Array(total);
+    for (let i = 0; i < total; i++) if (transparentData[i * 4 + 3] >= 8) mask[i] = 1;
+  } else {
+    ({ mask, transparentData, background } = removeEdgeConnectedBackground(data, w, h, tolerance));
+  }
+  const { labels, components } = labelComponents(mask, w, h);
+  return { transparentData, labels, groups: groupComponents(components, w, h), background };
+}
+
+function squarePlan(width, height) {
+  const scale = Math.min(1, EXPORT_SIZE / Math.max(width, height));
+  const drawWidth = Math.max(1, Math.round(width * scale));
+  const drawHeight = Math.max(1, Math.round(height * scale));
+  return {
+    side: EXPORT_SIZE,
+    drawWidth,
+    drawHeight,
+    offsetX: Math.floor((EXPORT_SIZE - drawWidth) / 2),
+    offsetY: Math.floor((EXPORT_SIZE - drawHeight) / 2)
+  };
+}
+
+function cropViewportPlan(width, height, zoom = 1, x, y) {
+  const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+  const scale = (EXPORT_SIZE / Math.min(width, height)) * safeZoom;
+  const drawWidth = Math.round(width * scale * 100) / 100;
+  const drawHeight = Math.round(height * scale * 100) / 100;
+  return {
+    side: EXPORT_SIZE,
+    scale,
+    drawWidth,
+    drawHeight,
+    x: Number.isFinite(x) ? x : (EXPORT_SIZE - drawWidth) / 2,
+    y: Number.isFinite(y) ? y : (EXPORT_SIZE - drawHeight) / 2
+  };
+}
+
+function eraseMaskStroke(mask, side, startX, startY, endX, endY, brushSize) {
+  const radius = Math.max(1, Number(brushSize) / 2);
+  const radiusSquared = radius * radius;
+  const distance = Math.hypot(endX - startX, endY - startY);
+  const steps = Math.max(1, Math.ceil(distance / Math.max(1, radius / 2)));
+  for (let step = 0; step <= steps; step++) {
+    const progress = step / steps;
+    const centerX = startX + (endX - startX) * progress;
+    const centerY = startY + (endY - startY) * progress;
+    const minX = Math.max(0, Math.floor(centerX - radius));
+    const maxX = Math.min(side - 1, Math.ceil(centerX + radius));
+    const minY = Math.max(0, Math.floor(centerY - radius));
+    const maxY = Math.min(side - 1, Math.ceil(centerY + radius));
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const xDistance = x - centerX;
+        const yDistance = y - centerY;
+        if (xDistance * xDistance + yDistance * yDistance <= radiusSquared) mask[y * side + x] = 1;
+      }
+    }
+  }
+  return mask;
+}
+
+function applyEraseMaskToPixels(pixels, eraseMask) {
+  const pixelCount = Math.min(eraseMask.length, Math.floor(pixels.length / 4));
+  for (let index = 0; index < pixelCount; index++) {
+    if (eraseMask[index]) pixels[index * 4 + 3] = 0;
+  }
+  return pixels;
+}
+
+function writeUint16(bytes, offset, value) {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = (value >>> 8) & 0xff;
+}
+
+function writeUint32(bytes, offset, value) {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = (value >>> 8) & 0xff;
+  bytes[offset + 2] = (value >>> 16) & 0xff;
+  bytes[offset + 3] = (value >>> 24) & 0xff;
+}
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (let index = 0; index < bytes.length; index++) {
+    crc ^= bytes[index];
+    for (let bit = 0; bit < 8; bit++) {
+      crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function concatByteArrays(parts, totalLength) {
+  const output = new Uint8Array(totalLength);
+  let offset = 0;
+  parts.forEach(part => {
+    output.set(part, offset);
+    offset += part.length;
+  });
+  return output;
+}
+
+function createZip(entries) {
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  let localOffset = 0;
+  let localLength = 0;
+  let centralLength = 0;
+
+  entries.forEach(entry => {
+    const nameBytes = encoder.encode(entry.name);
+    const fileBytes = entry.bytes instanceof Uint8Array ? entry.bytes : new Uint8Array(entry.bytes);
+    const checksum = crc32(fileBytes);
+    const local = new Uint8Array(30 + nameBytes.length + fileBytes.length);
+    writeUint32(local, 0, 0x04034b50);
+    writeUint16(local, 4, 20);
+    writeUint16(local, 6, 0x0800);
+    writeUint16(local, 8, 0);
+    writeUint32(local, 14, checksum);
+    writeUint32(local, 18, fileBytes.length);
+    writeUint32(local, 22, fileBytes.length);
+    writeUint16(local, 26, nameBytes.length);
+    writeUint16(local, 28, 0);
+    local.set(nameBytes, 30);
+    local.set(fileBytes, 30 + nameBytes.length);
+
+    const central = new Uint8Array(46 + nameBytes.length);
+    writeUint32(central, 0, 0x02014b50);
+    writeUint16(central, 4, 20);
+    writeUint16(central, 6, 20);
+    writeUint16(central, 8, 0x0800);
+    writeUint16(central, 10, 0);
+    writeUint32(central, 16, checksum);
+    writeUint32(central, 20, fileBytes.length);
+    writeUint32(central, 24, fileBytes.length);
+    writeUint16(central, 28, nameBytes.length);
+    writeUint16(central, 30, 0);
+    writeUint16(central, 32, 0);
+    writeUint32(central, 42, localOffset);
+    central.set(nameBytes, 46);
+
+    localParts.push(local);
+    centralParts.push(central);
+    localOffset += local.length;
+    localLength += local.length;
+    centralLength += central.length;
+  });
+
+  const end = new Uint8Array(22);
+  writeUint32(end, 0, 0x06054b50);
+  writeUint16(end, 8, entries.length);
+  writeUint16(end, 10, entries.length);
+  writeUint32(end, 12, centralLength);
+  writeUint32(end, 16, localLength);
+  return concatByteArrays([...localParts, ...centralParts, end], localLength + centralLength + end.length);
+}
+
+function dataUrlToBytes(dataUrl) {
+  const commaIndex = dataUrl.indexOf(',');
+  const header = dataUrl.slice(0, commaIndex);
+  if (commaIndex < 0 || !header.includes(';base64')) throw new Error('表情图片格式无效');
+  const binary = atob(dataUrl.slice(commaIndex + 1));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+function pieceFilename(theme, index) {
+  const name = String(theme || '').trim();
+  if (!name) {
+    if (!Number.isInteger(index) || index < 0) throw new Error('缺少表情顺序号');
+    return String(index + 1) + '.png';
+  }
+  if (Array.from(name).length > 40) throw new Error('主题名不能超过 40 个字符');
+  if (/[<>:"\/\\|?*\u0000-\u001f\u007f]/u.test(name) || name.startsWith('.') || name.endsWith('.')) {
+    throw new Error('主题名含文件名禁用字符或以句点开头、结尾');
+  }
+  if (/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/iu.test(name)) throw new Error('主题名不能使用系统保留名称');
+  return name + '.png';
+}
+
+function parseThemeList(text, count) {
+  const source = String(text || '').trim();
+  if (!source) throw new Error('请先粘贴用顿号“、”分隔的主题名');
+  const themes = source.split('、').map(item => item.trim());
+  themes[0] = themes[0].replace(/^.*[：:]\s*/u, '').trim();
+  while (themes.length && !themes[themes.length - 1]) themes.pop();
+  if (!themes.length) throw new Error('未找到主题名');
+  if (themes.length > count) throw new Error('解析出 ' + themes.length + ' 个位置，超过当前 ' + count + ' 张表情');
+  const used = new Set();
+  themes.forEach((theme, index) => {
+    if (!theme) return;
+    try {
+      pieceFilename(theme, index);
+    } catch (error) {
+      throw new Error('第 ' + (index + 1) + ' 个主题名：' + error.message);
+    }
+    if (used.has(theme)) throw new Error('主题名重复：' + theme);
+    used.add(theme);
+  });
+  return Array.from({ length: count }, (_, index) => themes[index] || '');
+}
+
+window.emojiCutterCore = {
+  equalGridRects,
+  segment: segmentStickers,
+  squarePlan,
+  cropViewportPlan,
+  eraseMaskStroke,
+  applyEraseMaskToPixels,
+  createZip,
+  pieceFilename,
+  parseThemeList
+};
+
+function doExtract() {
+  const url = URL.createObjectURL(currentFile);
+  const img = new Image();
+  img.onload = () => {
+    const w = img.width, h = img.height;
+    const cvs = document.createElement('canvas');
+    cvs.width = w; cvs.height = h;
+    const ctx = cvs.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const segmentation = segmentStickers(imageData.data, w, h, {
+      tolerance: parseInt(thresholdInput.value, 10)
+    });
+    if (!segmentation.groups.length) {
+      hideLoading();
+      alert('未检测到有效内容，请调低底色容差后重试');
+      return;
+    }
+    renderSmartResults(segmentation, w, h);
+  };
+  img.src = url;
+}
+
+function renderSmartResults(segmentation, width, height) {
+  pieces = [];
+  grid.innerHTML = '';
+  const groupByLabel = new Int32Array(segmentation.groups.reduce((max, group) =>
+    Math.max(max, ...group.labels), -1
+  ) + 1).fill(-1);
+  segmentation.groups.forEach((group, groupIndex) => group.labels.forEach(label => { groupByLabel[label] = groupIndex; }));
+
+  segmentation.groups.forEach((group, groupIndex) => {
+    const pad = 4;
+    const x1 = Math.max(0, group.minX - pad), y1 = Math.max(0, group.minY - pad);
+    const x2 = Math.min(width, group.maxX + pad + 1), y2 = Math.min(height, group.maxY + pad + 1);
+    const cellCvs = document.createElement('canvas');
+    cellCvs.width = x2 - x1; cellCvs.height = y2 - y1;
+    const cellCtx = cellCvs.getContext('2d');
+    const cellData = cellCtx.createImageData(cellCvs.width, cellCvs.height);
+
+    for (let y = y1; y < y2; y++) {
+      for (let x = x1; x < x2; x++) {
+        const sourcePixel = y * width + x;
+        const label = segmentation.labels[sourcePixel];
+        if (label < 0 || groupByLabel[label] !== groupIndex) continue;
+        const sourceOffset = sourcePixel * 4;
+        const targetOffset = ((y - y1) * cellCvs.width + x - x1) * 4;
+        cellData.data[targetOffset] = segmentation.transparentData[sourceOffset];
+        cellData.data[targetOffset + 1] = segmentation.transparentData[sourceOffset + 1];
+        cellData.data[targetOffset + 2] = segmentation.transparentData[sourceOffset + 2];
+        cellData.data[targetOffset + 3] = segmentation.transparentData[sourceOffset + 3];
+      }
+    }
+    cellCtx.putImageData(cellData, 0, 0);
+    appendPiece(cellCvs);
+  });
+
+  refreshResultOrder();
+  const backgroundInfo = segmentation.background ? ' | 已去除边缘连通底色' : ' | 已保留原图透明底';
+  themeText.value = '';
+  parseStatus.textContent = '主题名不限语言；留空按 1.png、2.png……命名。';
+  info.textContent = width + 'x' + height + ' | 智能拆分去底色 | 全部输出为 240×240 透明 PNG' + backgroundInfo + ' | 主题名可选，点击预览下载';
+  result.style.display = 'block';
+  hideLoading();
+}
+
+// ============================================================
+//  渲染结果
+// ============================================================
+
+function makeSquareCanvas(sourceCanvas) {
+  const plan = squarePlan(sourceCanvas.width, sourceCanvas.height);
+  const squareCanvas = document.createElement('canvas');
+  squareCanvas.width = plan.side;
+  squareCanvas.height = plan.side;
+  squareCanvas.getContext('2d').drawImage(
+    sourceCanvas,
+    0,
+    0,
+    sourceCanvas.width,
+    sourceCanvas.height,
+    plan.offsetX,
+    plan.offsetY,
+    plan.drawWidth,
+    plan.drawHeight
+  );
+  return squareCanvas;
+}
+
+function appendPiece(sourceCanvas) {
+  const pieceIndex = pieces.length;
+  const squareCanvas = makeSquareCanvas(sourceCanvas);
+  const piece = {
+    dataUrl: squareCanvas.toDataURL('image/png'),
+    sourceDataUrl: sourceCanvas.toDataURL('image/png'),
+    sourceWidth: sourceCanvas.width,
+    sourceHeight: sourceCanvas.height,
+    manuallyCropped: false
+  };
+  pieces.push(piece);
+
+  const item = document.createElement('div');
+  item.className = 'grid-item';
+  piece.itemElement = item;
+  item.title = '#' + (pieceIndex + 1) + '，240×240，点击预览下载';
+  const el = document.createElement('img');
+  el.src = piece.dataUrl;
+  el.alt = '第 ' + (pieceIndex + 1) + ' 张 240×240 表情';
+  el.addEventListener('click', () => downloadPiece(pieces.indexOf(piece)));
+  item.appendChild(el);
+  piece.previewElement = el;
+
+  const actions = document.createElement('div');
+  actions.className = 'piece-actions';
+  item.appendChild(actions);
+
+  const deleteButton = document.createElement('button');
+  deleteButton.className = 'piece-action piece-delete';
+  deleteButton.type = 'button';
+  deleteButton.title = '删除这张表情';
+  deleteButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M9 6V4h6v2M6 6l1 14h10l1-14M10 10v7M14 10v7"/></svg>';
+  deleteButton.setAttribute('aria-label', '删除第 ' + (pieceIndex + 1) + ' 张切割结果');
+  deleteButton.addEventListener('click', event => {
+    event.stopPropagation();
+    deletePiece(piece);
+  });
+  actions.appendChild(deleteButton);
+  piece.deleteButton = deleteButton;
+
+  const cropButton = document.createElement('button');
+  cropButton.className = 'piece-action piece-crop';
+  cropButton.type = 'button';
+  cropButton.title = '调整裁切';
+  cropButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v12a3 3 0 0 0 3 3h12M3 6h12a3 3 0 0 1 3 3v12"/></svg>';
+  cropButton.setAttribute('aria-label', '裁切第 ' + (pieceIndex + 1) + ' 张表情');
+  cropButton.addEventListener('click', event => {
+    event.stopPropagation();
+    openCropper(pieces.indexOf(piece));
+  });
+  actions.appendChild(cropButton);
+  piece.cropButton = cropButton;
+
+  const nameInput = document.createElement('input');
+  nameInput.className = 'piece-name';
+  nameInput.type = 'text';
+  nameInput.placeholder = '主题名';
+  nameInput.title = '主题名可选，留空时按序号命名';
+  nameInput.setAttribute('aria-label', '第 ' + (pieceIndex + 1) + ' 张表情的主题名，可留空');
+  actions.appendChild(nameInput);
+  piece.nameInput = nameInput;
+  grid.appendChild(item);
+}
+
+function refreshResultOrder() {
+  const count = pieces.length;
+  resultTitle.textContent = '切割结果 (' + count + ' 张)';
+  downloadAll.disabled = count === 0;
+  parseThemesButton.disabled = count === 0;
+  pieces.forEach((piece, index) => {
+    piece.itemElement.title = '#' + (index + 1) + '，240×240，点击预览下载';
+    piece.previewElement.alt = '第 ' + (index + 1) + ' 张 240×240 表情';
+    piece.nameInput.setAttribute('aria-label', '第 ' + (index + 1) + ' 张表情的主题名，可留空');
+    piece.deleteButton.setAttribute('aria-label', '删除第 ' + (index + 1) + ' 张切割结果');
+    piece.cropButton.setAttribute('aria-label', '裁切第 ' + (index + 1) + ' 张表情');
+  });
+}
+
+function deletePiece(piece) {
+  const index = pieces.indexOf(piece);
+  if (index < 0) return;
+  pieces.splice(index, 1);
+  piece.itemElement.remove();
+  refreshResultOrder();
+  parseStatus.textContent = pieces.length
+    ? '已删除第 ' + (index + 1) + ' 张；剩余未命名表情按当前顺序号命名。'
+    : '已删除全部切割结果，请重新切割。';
+}
+
+function cropPointerPosition(event) {
+  const rect = cropPreview.getBoundingClientRect();
+  return {
+    x: (event.clientX - rect.left) * EXPORT_SIZE / rect.width,
+    y: (event.clientY - rect.top) * EXPORT_SIZE / rect.height
+  };
+}
+
+function applyEraseMaskToCanvas(context, eraseMask) {
+  if (!eraseMask) return;
+  const imageData = context.getImageData(0, 0, EXPORT_SIZE, EXPORT_SIZE);
+  applyEraseMaskToPixels(imageData.data, eraseMask);
+  context.putImageData(imageData, 0, 0);
+}
+
+function updateCropTools() {
+  if (!cropState) return;
+  const erasing = cropState.mode === 'erase';
+  cropMove.classList.toggle('active', !erasing);
+  cropErase.classList.toggle('active', erasing);
+  cropMove.setAttribute('aria-pressed', String(!erasing));
+  cropErase.setAttribute('aria-pressed', String(erasing));
+  cropEraseControls.hidden = !erasing;
+  cropUndo.disabled = cropState.eraseStrokes.length === 0;
+  cropClear.disabled = cropState.eraseStrokes.length === 0;
+  cropPreview.classList.toggle('erasing', erasing);
+}
+
+function drawCropPreview() {
+  if (!cropState) return;
+  cropPreview.width = EXPORT_SIZE;
+  cropPreview.height = EXPORT_SIZE;
+  const ctx = cropPreview.getContext('2d');
+  ctx.clearRect(0, 0, EXPORT_SIZE, EXPORT_SIZE);
+  ctx.drawImage(cropState.image, cropState.x, cropState.y, cropState.drawWidth, cropState.drawHeight);
+  applyEraseMaskToCanvas(ctx, cropState.eraseMask);
+  ctx.strokeStyle = '#ff6b35';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, EXPORT_SIZE - 2, EXPORT_SIZE - 2);
+  cropHint.textContent = cropState.mode === 'erase'
+    ? '在图片上涂抹即可擦成透明；笔刷仅影响当前 240×240 导出图，可撤销或清空。'
+    : '拖动原图并调整缩放。橙色方框固定为 240×240；方框内未被原图覆盖的区域会保持透明。';
+}
+
+function setCropZoom(zoom) {
+  if (!cropState) return;
+  const next = cropViewportPlan(cropState.width, cropState.height, zoom);
+  const scaleRatio = next.scale / cropState.scale;
+  cropState.zoom = zoom;
+  cropState.scale = next.scale;
+  cropState.drawWidth = next.drawWidth;
+  cropState.drawHeight = next.drawHeight;
+  cropState.x = EXPORT_SIZE / 2 - (EXPORT_SIZE / 2 - cropState.x) * scaleRatio;
+  cropState.y = EXPORT_SIZE / 2 - (EXPORT_SIZE / 2 - cropState.y) * scaleRatio;
+  cropZoom.value = String(Math.round(zoom * 100));
+  cropZoomValue.textContent = Math.round(zoom * 100) + '%';
+  drawCropPreview();
+}
+
+function resetCropView() {
+  if (!cropState) return;
+  const initial = cropViewportPlan(cropState.width, cropState.height);
+  Object.assign(cropState, initial, { zoom: 1, dragging: false, erasing: false, activeStroke: null });
+  cropZoom.value = '100';
+  cropZoomValue.textContent = '100%';
+  drawCropPreview();
+}
+
+function setCropMode(mode) {
+  if (!cropState) return;
+  cropState.mode = mode === 'erase' ? 'erase' : 'move';
+  updateCropTools();
+  drawCropPreview();
+}
+
+function redrawEraseMask() {
+  if (!cropState) return;
+  cropState.eraseMask.fill(0);
+  cropState.eraseStrokes.forEach(stroke => {
+    stroke.points.forEach((point, index) => {
+      const previous = stroke.points[Math.max(0, index - 1)];
+      eraseMaskStroke(cropState.eraseMask, EXPORT_SIZE, previous.x, previous.y, point.x, point.y, stroke.brushSize);
+    });
+  });
+}
+
+function undoEraseStroke() {
+  if (!cropState || !cropState.eraseStrokes.length) return;
+  cropState.eraseStrokes.pop();
+  redrawEraseMask();
+  updateCropTools();
+  drawCropPreview();
+}
+
+function clearEraseStrokes() {
+  if (!cropState || !cropState.eraseStrokes.length) return;
+  cropState.eraseStrokes = [];
+  cropState.eraseMask.fill(0);
+  updateCropTools();
+  drawCropPreview();
+}
+
+async function openCropper(index) {
+  const piece = pieces[index];
+  if (!piece) return;
+  try {
+    const image = await loadImage(piece.sourceDataUrl);
+    if (!pieces.includes(piece)) return;
+    const initial = cropViewportPlan(piece.sourceWidth, piece.sourceHeight);
+    cropState = {
+      piece, image, width: piece.sourceWidth, height: piece.sourceHeight, ...initial,
+      zoom: 1, mode: 'move', dragging: false, erasing: false, activeStroke: null,
+      eraseMask: new Uint8Array(EXPORT_SIZE * EXPORT_SIZE), eraseStrokes: []
+    };
+    cropModal.classList.add('open');
+    resetCropView();
+    setCropMode('move');
+  } catch (error) {
+    alert('无法打开该表情进行裁切，请重新切割后再试');
+  }
+}
+
+function closeCropper() {
+  cropState = null;
+  cropPreview.classList.remove('dragging');
+  cropPreview.classList.remove('erasing');
+  cropModal.classList.remove('open');
+}
+
+function applyCropper() {
+  if (!cropState) return;
+  const state = cropState;
+  const output = document.createElement('canvas');
+  output.width = EXPORT_SIZE;
+  output.height = EXPORT_SIZE;
+  const outputContext = output.getContext('2d');
+  outputContext.drawImage(
+    state.image,
+    state.x,
+    state.y,
+    state.drawWidth,
+    state.drawHeight
+  );
+  applyEraseMaskToCanvas(outputContext, state.eraseMask);
+  const piece = state.piece;
+  if (!pieces.includes(piece)) { closeCropper(); return; }
+  piece.dataUrl = output.toDataURL('image/png');
+  piece.manuallyCropped = true;
+  piece.previewElement.src = piece.dataUrl;
+  closeCropper();
+}
+
+cropPreview.addEventListener('pointerdown', event => {
+  if (!cropState) return;
+  const point = cropPointerPosition(event);
+  if (cropState.mode === 'erase') {
+    cropState.erasing = true;
+    cropState.activeStroke = { brushSize: Number(cropBrushSize.value), points: [point] };
+    eraseMaskStroke(cropState.eraseMask, EXPORT_SIZE, point.x, point.y, point.x, point.y, cropState.activeStroke.brushSize);
+    drawCropPreview();
+  } else {
+    cropState.dragging = true;
+    cropState.grabX = point.x - cropState.x;
+    cropState.grabY = point.y - cropState.y;
+    cropPreview.classList.add('dragging');
+  }
+  if (cropPreview.setPointerCapture) cropPreview.setPointerCapture(event.pointerId);
+  event.preventDefault();
+});
+
+cropPreview.addEventListener('pointermove', event => {
+  if (!cropState || (!cropState.dragging && !cropState.erasing)) return;
+  const point = cropPointerPosition(event);
+  if (cropState.erasing && cropState.activeStroke) {
+    const points = cropState.activeStroke.points;
+    const previous = points[points.length - 1];
+    eraseMaskStroke(cropState.eraseMask, EXPORT_SIZE, previous.x, previous.y, point.x, point.y, cropState.activeStroke.brushSize);
+    points.push(point);
+  } else {
+    cropState.x = point.x - cropState.grabX;
+    cropState.y = point.y - cropState.grabY;
+  }
+  drawCropPreview();
+  event.preventDefault();
+});
+
+function finishCropPointer() {
+  if (!cropState) return;
+  if (cropState.erasing && cropState.activeStroke) {
+    cropState.eraseStrokes.push(cropState.activeStroke);
+    cropState.activeStroke = null;
+    cropState.erasing = false;
+    updateCropTools();
+  }
+  cropState.dragging = false;
+  cropPreview.classList.remove('dragging');
+}
+
+cropPreview.addEventListener('pointerup', finishCropPointer);
+cropPreview.addEventListener('pointercancel', finishCropPointer);
+cropZoom.addEventListener('input', () => setCropZoom(Number(cropZoom.value) / 100));
+cropReset.addEventListener('click', resetCropView);
+cropMove.addEventListener('click', () => setCropMode('move'));
+cropErase.addEventListener('click', () => setCropMode('erase'));
+cropBrushSize.addEventListener('input', () => { cropBrushValue.textContent = cropBrushSize.value + 'px'; });
+cropUndo.addEventListener('click', undoEraseStroke);
+cropClear.addEventListener('click', clearEraseStrokes);
+cropClose.addEventListener('click', closeCropper);
+cropCancel.addEventListener('click', closeCropper);
+cropApply.addEventListener('click', applyCropper);
+cropModal.addEventListener('click', event => { if (event.target === cropModal) closeCropper(); });
+if (window.addEventListener) window.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && cropState) closeCropper();
+});
+
+function renderResults(img, rects, label) {
+  pieces = [];
+  grid.innerHTML = '';
+
+  for (let i = 0; i < rects.length; i++) {
+    const [x1, y1, x2, y2] = rects[i];
+    const cw = x2 - x1, ch = y2 - y1;
+
+    const cellCvs = document.createElement('canvas');
+    cellCvs.width = cw; cellCvs.height = ch;
+    const cellCtx = cellCvs.getContext('2d');
+    cellCtx.drawImage(img, x1, y1, cw, ch, 0, 0, cw, ch);
+
+    appendPiece(cellCvs);
+  }
+
+  refreshResultOrder();
+  themeText.value = '';
+  parseStatus.textContent = '主题名不限语言；留空按 1.png、2.png……命名。';
+  info.textContent = img.width + 'x' + img.height + ' | ' + label + ' | 全部输出为 240×240 透明 PNG | 主题名可选，点击预览下载';
+  result.style.display = 'block';
+  hideLoading();
+}
+
+function downloadPiece(index) {
+  try {
+    downloadUrl(pieces[index].dataUrl, exportName(index));
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+function exportName(index) {
+  try {
+    return pieceFilename(pieces[index].nameInput.value, index);
+  } catch (error) {
+    pieces[index].nameInput.focus();
+    throw new Error('第 ' + (index + 1) + ' 张表情：' + error.message);
+  }
+}
+
+parseThemesButton.addEventListener('click', () => {
+  try {
+    const themes = parseThemeList(themeText.value, pieces.length);
+    pieces.forEach((piece, index) => { piece.nameInput.value = themes[index]; });
+    const filled = themes.filter(Boolean).length;
+    parseStatus.textContent = '已按顺序填入 ' + filled + ' 个主题名；其余留空的表情按序号命名。';
+  } catch (error) {
+    parseStatus.textContent = error.message;
+    themeText.focus();
+  }
+});
+
+function downloadUrl(url, filename) {
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = url;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+downloadAll.addEventListener('click', () => {
+  if (!currentFile || !pieces.length) return;
+  try {
+    const stem = albumName.value.trim();
+    if (!/^[\u4e00-\u9fff（）·]{1,30}$/u.test(stem)) {
+      albumName.focus();
+      throw new Error('专辑名须使用中文，不含英文字母或数字');
+    }
+    const used = new Set();
+    const entries = pieces.map((piece, index) => {
+      const name = exportName(index);
+      if (used.has(name)) {
+        piece.nameInput.focus();
+        throw new Error('表情主题名重复：' + name);
+      }
+      used.add(name);
+      return { name, bytes: dataUrlToBytes(piece.dataUrl) };
+    });
+    const zip = createZip(entries);
+    const url = URL.createObjectURL(new Blob([zip], { type: 'application/zip' }));
+    downloadUrl(url, stem + '.zip');
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (error) {
+    alert('无法下载 ZIP：' + error.message);
+  }
+});
+</script>
+
+</body>
+</html>
