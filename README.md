@@ -16,6 +16,49 @@
 
 <img src="docs/images/sunshine-sun-album.png" alt="阳光小太阳：16 张表情整组预览" width="650">
 
+## 安装
+
+下载或克隆**整个仓库**，保留 `SKILL.md`、`scripts/`、`assets/` 和 `references/`；只复制 `SKILL.md` 会缺少切割与质检工具。
+
+### Codex
+
+```bash
+mkdir -p "$HOME/.codex/skills"
+git clone https://github.com/zxd-666/weixin-sticker.git "$HOME/.codex/skills/weixin-sticker"
+python3 -m venv ~/.codex/skills/weixin-sticker/.venv
+~/.codex/skills/weixin-sticker/.venv/bin/python -m pip install -r ~/.codex/skills/weixin-sticker/requirements.txt
+```
+
+也可以下载仓库 ZIP，解压后把 `weixin-sticker` 文件夹放进 `~/.codex/skills/`，再在新对话里使用。
+
+### WorkBuddy、豆包工作等 Agent
+
+这些产品有各自的技能入口，不使用 Codex 的目录路径。[WorkBuddy 官方文档](https://www.workbuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Skills-Market)介绍了「添加技能 → 上传技能」导入本地技能包；[豆包开放平台](https://open.doubao.com/)也提供 Skill 能力。按所用产品的当前安装方式导入完整仓库，并确认运行环境具备图片生成、文件访问、Python 3 和 Pillow。跨 Agent 的实际执行效果取决于这些能力与权限配置。
+
+## 开始制作
+
+直接完成示例：
+
+> 使用 weixin-sticker，按我提供的角色参考图制作 16 张微信静态表情。画风是毛毡卡通，场景包括你好、收到、无语、下班、晚安。不需要后续逐步确认，请完成整套素材、检查并打包交付。
+
+如果希望逐阶段把关，把最后一句改成「需要逐步确认，先给我看整组表情」。涉及真人或特定角色时，请提供清晰的本人或有使用权的参考图，并说明必须保留的外貌特征。
+
+交付目录示例：
+
+```text
+专辑目录/
+├── 表情/            8–24 张 240×240 透明 PNG，逐张命名
+├── 详情页横幅.png    750×400
+├── 表情封面.png      240×240 透明 PNG
+├── 聊天页图标.png    50×50 透明 PNG
+├── 赞赏引导图.png    可选，750×560
+└── 赞赏致谢图.png    可选，750×750
+```
+
+实际交付的横幅、赞赏图也可能是 JPG，见[完整素材规格与质检说明](references/wechat-album-spec.md)。ZIP 是整理和交付方式；**平台投稿时需解压，并把各文件上传到对应字段**。
+
+## 更多作品
+
 ### 毛毡张张：一张图看完整套交付
 
 16 张表情之外，预览图还展示了横幅、封面、聊天页图标和两张赞赏配图。
@@ -110,46 +153,6 @@ flowchart TD
 
 机器检查覆盖数量、格式、尺寸、透明像素和体积；角色一致性、动作差异、边缘和画面质量还要目视检查。当前 Skill **只做静态表情**，不制作动态 GIF。表情画面默认无字；只有明确要求时才加字，主题名用于单图命名和清单。
 
-## 安装
-
-下载或克隆**整个仓库**，保留 `SKILL.md`、`scripts/`、`assets/` 和 `references/`；只复制 `SKILL.md` 会缺少切割与质检工具。
-
-### Codex
-
-```bash
-git clone https://github.com/zxd-666/weixin-sticker.git ~/.codex/skills/weixin-sticker
-python3 -m venv ~/.codex/skills/weixin-sticker/.venv
-~/.codex/skills/weixin-sticker/.venv/bin/python -m pip install -r ~/.codex/skills/weixin-sticker/requirements.txt
-```
-
-也可以下载仓库 ZIP，解压后把 `weixin-sticker` 文件夹放进 `~/.codex/skills/`，再在新对话里使用。
-
-### WorkBuddy、豆包工作等 Agent
-
-这些产品有各自的技能入口，不使用 Codex 的目录路径。[WorkBuddy 官方文档](https://www.workbuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Skills-Market)介绍了「添加技能 → 上传技能」导入本地技能包；[豆包开放平台](https://open.doubao.com/)也提供 Skill 能力。按所用产品的当前安装方式导入完整仓库，并确认运行环境具备图片生成、文件访问、Python 3 和 Pillow。跨 Agent 的实际执行效果取决于这些能力与权限配置。
-
-## 开始制作
-
-直接完成示例：
-
-> 使用 weixin-sticker，按我提供的角色参考图制作 16 张微信静态表情。画风是毛毡卡通，场景包括你好、收到、无语、下班、晚安。不需要后续逐步确认，请完成整套素材、检查并打包交付。
-
-如果希望逐阶段把关，把最后一句改成「需要逐步确认，先给我看整组表情」。涉及真人或特定角色时，请提供清晰的本人或有使用权的参考图，并说明必须保留的外貌特征。
-
-交付目录示例：
-
-```text
-专辑目录/
-├── 表情/            8–24 张 240×240 透明 PNG，逐张命名
-├── 详情页横幅.png    750×400
-├── 表情封面.png      240×240 透明 PNG
-├── 聊天页图标.png    50×50 透明 PNG
-├── 赞赏引导图.png    可选，750×560
-└── 赞赏致谢图.png    可选，750×750
-```
-
-实际交付的横幅、赞赏图也可能是 JPG，见[完整素材规格与质检说明](references/wechat-album-spec.md)。ZIP 是整理和交付方式；**平台投稿时需解压，并把各文件上传到对应字段**。
-
 ## 微信表情开放平台：入口与投稿清单
 
 - [微信表情开放平台](https://sticker.weixin.qq.com/)：注册、登录及提交作品入口。
@@ -178,3 +181,7 @@ Node.js 只用于运行切割工具测试；实际在浏览器使用切割 HTML 
 ## 许可证
 
 [MIT](LICENSE) © 2026 [zxd-666](https://github.com/zxd-666)。
+
+## 联系
+
+张张实验室 · [GitHub](https://github.com/zxd-666) · [小红书](https://xhslink.cn/o/7DSli2Fl3Vb)
